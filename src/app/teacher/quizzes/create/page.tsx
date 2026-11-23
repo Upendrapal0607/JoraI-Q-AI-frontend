@@ -318,20 +318,15 @@ export default function CreateQuizPage() {
               className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4 relative group"
             >
               <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <span className="text-xs font-extrabold text-indigo-600 px-2.5 py-1 rounded-full bg-indigo-50 border border-indigo-100">
-                    Question {qIdx + 1}
-                  </span>
-                  <span className="text-[10px] text-slate-400 font-mono font-medium">
-                    [Index: {qIdx}]
-                  </span>
-                </div>
+                <span className="text-xs font-extrabold text-indigo-600 px-2.5 py-1 rounded-full bg-indigo-50 border border-indigo-100">
+                  Question {qIdx + 1}
+                </span>
 
                 {questions.length > 1 && (
                   <button
                     type="button"
                     onClick={() => removeQuestion(qIdx)}
-                    title={`Remove Question ${qIdx + 1} (Index ${qIdx})`}
+                    title={`Remove Question ${qIdx + 1}`}
                     className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition"
                   >
                     <Trash2 className="w-4 h-4" />

@@ -182,11 +182,11 @@ export default function TeacherDashboardPage() {
             </h2>
           </div>
 
-          {/* Quick array element navigation pills */}
+          {/* Quick quiz navigation pills */}
           {quizzes.length > 0 && (
             <div className="flex items-center gap-1.5 overflow-x-auto pb-1 max-w-full">
               <span className="text-[11px] font-semibold text-slate-400 shrink-0 mr-1">
-                Array Elements:
+                Jump to:
               </span>
               {quizzes.map((q, idx) => (
                 <a
@@ -248,9 +248,6 @@ export default function TeacherDashboardPage() {
                         <div className="flex items-center gap-2 mb-1.5">
                           <span className="text-[10px] font-extrabold uppercase tracking-wider px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-100">
                             Quiz #{index + 1}
-                          </span>
-                          <span className="text-[10px] text-slate-400 font-mono font-medium">
-                            [Index: {index}]
                           </span>
                         </div>
                         <h3 className="text-base font-bold text-slate-900 tracking-tight leading-snug">
