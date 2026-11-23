@@ -15,92 +15,116 @@ import {
 } from 'lucide-react';
 
 interface QuestionFormItem {
+  id: string;
   text: string;
   options: { text: string; isCorrect: boolean }[];
 }
+
+const createNewQuestion = (): QuestionFormItem => ({
+  id: Math.random().toString(36).substring(2, 9) + Date.now().toString(36),
+  text: '',
+  options: [
+    { text: '', isCorrect: true },
+    { text: '', isCorrect: false },
+    { text: '', isCorrect: false },
+    { text: '', isCorrect: false },
+  ],
+});
 
 export default function CreateQuizPage() {
   const router = useRouter();
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
-  const [questions, setQuestions] = useState<QuestionFormItem[]>([
-    {
-      text: '',
-      options: [
-        { text: '', isCorrect: true },
-        { text: '', isCorrect: false },
-        { text: '', isCorrect: false },
-        { text: '', isCorrect: false },
-      ],
-    },
-  ]);
+  const [questions, setQuestions] = useState<QuestionFormItem[]>([createNewQuestion()]);
   const [titleError, setTitleError] = useState<string | null>(null);
   const [questionErrors, setQuestionErrors] = useState<
-    Record<number, { text?: string; options?: Record<number, string> }>
+    Record<string, { text?: string; options?: Record<number, string> }>
   >({});
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const addQuestion = () => {
-    setQuestions([
-      ...questions,
-      {
-        text: '',
-        options: [
-          { text: '', isCorrect: true },
-          { text: '', isCorrect: false },
-          { text: '', isCorrect: false },
-          { text: '', isCorrect: false },
-        ],
-      },
-    ]);
+    setQuestions((prev) => [...prev, createNewQuestion()]);
   };
 
-  const removeQuestion = (qIndex: number) => {
+  const removeQuestion = (target: string | number) => {
     if (questions.length <= 1) {
       alert('A quiz must have at least one question.');
       return;
     }
-    setQuestions(questions.filter((_, idx) => idx !== qIndex));
-    const updatedErrors = { ...questionErrors };
-    delete updatedErrors[qIndex];
-    setQuestionErrors(updatedErrors);
-  };
 
-  const updateQuestionText = (qIndex: number, text: string) => {
-    const updated = [...questions];
-    updated[qIndex].text = text;
-    setQuestions(updated);
-    if (questionErrors[qIndex]?.text) {
-      setQuestionErrors((prev) => ({
-        ...prev,
-        [qIndex]: { ...prev[qIndex], text: undefined },
-      }));
+    let targetId = '';
+    // Only delete that particular element and automatically rearrange remaining elements in the array
+    setQuestions((prev) => {
+      if (typeof target === 'number') {
+        const itemToRemove = prev[target];
+        if (itemToRemove) targetId = itemToRemove.id;
+        return prev.filter((_, idx) => idx !== target);
+      } else {
+        targetId = target;
+        return prev.filter((q) => q.id !== target);
+      }
+    });
+
+    if (targetId) {
+      setQuestionErrors((prev) => {
+        const updated = { ...prev };
+        delete updated[targetId];
+        return updated;
+      });
     }
   };
 
-  const updateOptionText = (qIndex: number, optIndex: number, text: string) => {
-    const updated = [...questions];
-    updated[qIndex].options[optIndex].text = text;
-    setQuestions(updated);
-    if (questionErrors[qIndex]?.options?.[optIndex]) {
-      setQuestionErrors((prev) => ({
+  const updateQuestionText = (qId: string, text: string) => {
+    setQuestions((prev) =>
+      prev.map((q) => (q.id === qId ? { ...q, text } : q)),
+    );
+    setQuestionErrors((prev) => {
+      if (!prev[qId]?.text) return prev;
+      return {
         ...prev,
-        [qIndex]: {
-          ...prev[qIndex],
-          options: { ...prev[qIndex]?.options, [optIndex]: undefined },
+        [qId]: { ...prev[qId], text: undefined },
+      };
+    });
+  };
+
+  const updateOptionText = (qId: string, optIndex: number, text: string) => {
+    setQuestions((prev) =>
+      prev.map((q) => {
+        if (q.id !== qId) return q;
+        return {
+          ...q,
+          options: q.options.map((opt, idx) =>
+            idx === optIndex ? { ...opt, text } : opt,
+          ),
+        };
+      }),
+    );
+    setQuestionErrors((prev) => {
+      if (!prev[qId]?.options?.[optIndex]) return prev;
+      return {
+        ...prev,
+        [qId]: {
+          ...prev[qId],
+          options: { ...prev[qId]?.options, [optIndex]: undefined },
         },
-      }));
-    }
+      };
+    });
   };
 
-  const setCorrectOption = (qIndex: number, optIndex: number) => {
-    const updated = [...questions];
-    updated[qIndex].options = updated[qIndex].options.map((opt, idx) => ({
-      ...opt,
-      isCorrect: idx === optIndex,
-    }));
-    setQuestions(updated);
+  const setCorrectOption = (qId: string, optIndex: number) => {
+    setQuestions((prev) =>
+      prev.map((q) => {
+        if (q.id !== qId) return q;
+        return {
+          ...q,
+          options: q.options.map((opt, idx) => ({
+            ...opt,
+            isCorrect: idx === optIndex,
+          })),
+        };
+      }),
+    );
   };
 
   const validate = () => {
@@ -116,7 +140,7 @@ export default function CreateQuizPage() {
     }
 
     // Validate questions and options
-    const newQErrors: Record<number, { text?: string; options?: Record<number, string> }> = {};
+    const newQErrors: Record<string, { text?: string; options?: Record<number, string> }> = {};
 
     for (let i = 0; i < questions.length; i++) {
       const q = questions[i];
@@ -146,7 +170,7 @@ export default function CreateQuizPage() {
       }
 
       if (qErr.text || qErr.options) {
-        newQErrors[i] = qErr;
+        newQErrors[q.id] = qErr;
       }
     }
 
@@ -163,11 +187,20 @@ export default function CreateQuizPage() {
 
     setIsSubmitting(true);
     try {
-      const created = await api.post<any>('/quizzes', {
+      // Strip frontend-only id before sending to backend
+      const payload = {
         title: title.trim(),
         description: description.trim() || undefined,
-        questions,
-      });
+        questions: questions.map((q) => ({
+          text: q.text.trim(),
+          options: q.options.map((opt) => ({
+            text: opt.text.trim(),
+            isCorrect: opt.isCorrect,
+          })),
+        })),
+      };
+
+      const created = await api.post<any>('/quizzes', payload);
 
       // Redirect to assign page for this quiz
       router.push(`/teacher/quizzes/${created.id}/assign`);
@@ -253,36 +286,52 @@ export default function CreateQuizPage() {
 
         {/* Questions Section */}
         <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-sm font-bold text-slate-900 flex items-center gap-2">
-              <Sparkles className="w-4 h-4 text-indigo-600" />
-              Multiple Choice Questions ({questions.length})
-            </h2>
-            <button
-              type="button"
-              onClick={addQuestion}
-              className="px-3 py-1.5 rounded-lg border border-indigo-200 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-bold flex items-center gap-1.5 transition"
-            >
-              <PlusCircle className="w-3.5 h-3.5" />
-              Add Question
-            </button>
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div>
+              <h2 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                <Sparkles className="w-4 h-4 text-indigo-600" />
+                Multiple Choice Questions ({questions.length})
+              </h2>
+              <p className="text-[11px] text-slate-500 mt-0.5">
+                Questions are ordered sequentially. Deleting any item automatically rearranges the array.
+              </p>
+            </div>
+
+            <div className="flex items-center gap-2">
+              {/* Question Number Stepper array buttons */}
+           
+              <button
+                type="button"
+                onClick={addQuestion}
+                className="px-3 py-1.5 rounded-lg border border-indigo-200 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-bold flex items-center gap-1.5 transition shrink-0"
+              >
+                <PlusCircle className="w-3.5 h-3.5" />
+                Add Question
+              </button>
+            </div>
           </div>
 
           {questions.map((q, qIdx) => (
             <div
-              key={qIdx}
+              key={q.id}
+              id={`question-item-${q.id}`}
               className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4 relative group"
             >
               <div className="flex items-center justify-between">
-                <span className="text-xs font-extrabold text-indigo-600 px-2.5 py-1 rounded-full bg-indigo-50 border border-indigo-100">
-                  Question {qIdx + 1}
-                </span>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-extrabold text-indigo-600 px-2.5 py-1 rounded-full bg-indigo-50 border border-indigo-100">
+                    Question {qIdx + 1}
+                  </span>
+                  <span className="text-[10px] text-slate-400 font-mono font-medium">
+                    [Index: {qIdx}]
+                  </span>
+                </div>
 
                 {questions.length > 1 && (
                   <button
                     type="button"
                     onClick={() => removeQuestion(qIdx)}
-                    title="Remove question"
+                    title={`Remove Question ${qIdx + 1} (Index ${qIdx})`}
                     className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition"
                   >
                     <Trash2 className="w-4 h-4" />
@@ -297,18 +346,18 @@ export default function CreateQuizPage() {
                 <input
                   type="text"
                   value={q.text}
-                  onChange={(e) => updateQuestionText(qIdx, e.target.value)}
+                  onChange={(e) => updateQuestionText(q.id, e.target.value)}
                   placeholder="Type your question statement here..."
                   className={`w-full px-3.5 py-2.5 text-xs font-medium rounded-xl border transition focus:outline-none focus:ring-2 ${
-                    questionErrors[qIdx]?.text
+                    questionErrors[q.id]?.text
                       ? 'border-rose-300 focus:border-rose-500 focus:ring-rose-500/20 bg-rose-50/20'
                       : 'border-slate-200 focus:border-indigo-600 focus:ring-indigo-500/20'
                   }`}
                 />
-                {questionErrors[qIdx]?.text && (
+                {questionErrors[q.id]?.text && (
                   <p className="text-[11px] text-rose-600 font-medium mt-1.5 flex items-center gap-1 animate-slide-up">
                     <AlertCircle className="w-3.5 h-3.5 shrink-0" />
-                    <span>{questionErrors[qIdx]?.text}</span>
+                    <span>{questionErrors[q.id]?.text}</span>
                   </p>
                 )}
               </div>
@@ -324,7 +373,7 @@ export default function CreateQuizPage() {
                 <div className="grid grid-cols-1 gap-2.5">
                   {q.options.map((opt, optIdx) => {
                     const letter = String.fromCharCode(65 + optIdx);
-                    const hasOptError = !!questionErrors[qIdx]?.options?.[optIdx];
+                    const hasOptError = !!questionErrors[q.id]?.options?.[optIdx];
 
                     return (
                       <div key={optIdx} className="space-y-1">
@@ -340,9 +389,9 @@ export default function CreateQuizPage() {
                           <label className="flex items-center cursor-pointer pl-1">
                             <input
                               type="radio"
-                              name={`correct-q-${qIdx}`}
+                              name={`correct-q-${q.id}`}
                               checked={opt.isCorrect}
-                              onChange={() => setCorrectOption(qIdx, optIdx)}
+                              onChange={() => setCorrectOption(q.id, optIdx)}
                               className="w-4 h-4 text-emerald-600 border-slate-300 focus:ring-emerald-500 cursor-pointer"
                             />
                           </label>
@@ -352,7 +401,7 @@ export default function CreateQuizPage() {
                           <input
                             type="text"
                             value={opt.text}
-                            onChange={(e) => updateOptionText(qIdx, optIdx, e.target.value)}
+                            onChange={(e) => updateOptionText(q.id, optIdx, e.target.value)}
                             placeholder={`Enter Option ${letter} text`}
                             className="flex-1 bg-transparent border-none text-xs focus:outline-none text-slate-800 placeholder-slate-400"
                           />
@@ -367,7 +416,7 @@ export default function CreateQuizPage() {
                         {hasOptError && (
                           <p className="text-[11px] text-rose-600 font-medium pl-2 flex items-center gap-1 animate-slide-up">
                             <AlertCircle className="w-3 h-3 shrink-0" />
-                            <span>{questionErrors[qIdx]?.options?.[optIdx]}</span>
+                            <span>{questionErrors[q.id]?.options?.[optIdx]}</span>
                           </p>
                         )}
                       </div>

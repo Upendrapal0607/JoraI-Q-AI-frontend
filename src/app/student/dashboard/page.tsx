@@ -208,7 +208,7 @@ export default function StudentDashboardPage() {
                     </span>
                     <span className="flex items-center gap-1">
                       <User className="w-3.5 h-3.5 text-slate-400" />
-                      {item.teacherName || 'Instructor'}
+                      {item.teacherName || 'Teacher'}
                     </span>
                   </div>
 

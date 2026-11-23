@@ -32,6 +32,7 @@ export default function TeacherDashboardPage() {
   } | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const fetchDashboardData = async () => {
     setIsLoading(true);
@@ -53,15 +54,52 @@ export default function TeacherDashboardPage() {
     fetchDashboardData();
   }, []);
 
-  const handleDelete = async (quizId: string) => {
+  const handleDelete = async (quizId: string, targetIndex?: number) => {
     if (!confirm('Are you sure you want to delete this quiz? All assignments, attempts, and analytics will be removed.')) {
       return;
     }
+
+    setDeletingId(quizId);
+
+    // Save previous snapshot in case of network failure
+    const prevQuizzes = [...quizzes];
+    const prevOverview = overview ? { ...overview } : null;
+
+    // Remove ONLY that particular element from array and automatically rearrange remaining elements
+    setQuizzes((prev) => {
+      if (typeof targetIndex === 'number') {
+        return prev.filter((_, idx) => idx !== targetIndex);
+      }
+      return prev.filter((q) => q.id !== quizId);
+    });
+
+    if (overview) {
+      setOverview((prev) =>
+        prev
+          ? {
+              ...prev,
+              totalQuizzes: Math.max(0, prev.totalQuizzes - 1),
+            }
+          : null,
+      );
+    }
+
     try {
       await api.delete(`/quizzes/${quizId}`);
-      fetchDashboardData();
+      // Re-fetch in background to ensure perfect synchronization with server
+      const [quizzesData, overviewData] = await Promise.all([
+        api.get<Quiz[]>('/quizzes/teacher'),
+        api.get<any>('/analytics/overview'),
+      ]);
+      setQuizzes(quizzesData);
+      setOverview(overviewData);
     } catch (err: any) {
+      // Revert if delete failed
+      setQuizzes(prevQuizzes);
+      if (prevOverview) setOverview(prevOverview);
       alert(err.message || 'Failed to delete quiz');
+    } finally {
+      setDeletingId(null);
     }
   };
 
@@ -136,11 +174,32 @@ export default function TeacherDashboardPage() {
 
       {/* Quizzes List Section */}
       <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <div className="flex items-center gap-2">
             <BookOpen className="w-5 h-5 text-indigo-600" />
-            Your Created Quizzes ({quizzes.length})
-          </h2>
+            <h2 className="text-lg font-bold text-slate-900">
+              Your Created Quizzes ({quizzes.length})
+            </h2>
+          </div>
+
+          {/* Quick array element navigation pills */}
+          {quizzes.length > 0 && (
+            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 max-w-full">
+              <span className="text-[11px] font-semibold text-slate-400 shrink-0 mr-1">
+                Array Elements:
+              </span>
+              {quizzes.map((q, idx) => (
+                <a
+                  key={q.id}
+                  href={`#quiz-item-${q.id}`}
+                  className="px-2 py-0.5 rounded-lg text-[10px] font-bold bg-slate-100 hover:bg-indigo-50 hover:text-indigo-600 text-slate-600 border border-slate-200 flex items-center gap-1 transition shrink-0"
+                  title={`Quiz #${idx + 1}: ${q.title}`}
+                >
+                  #{idx + 1}
+                </a>
+              ))}
+            </div>
+          )}
         </div>
 
         {isLoading ? (
@@ -171,7 +230,7 @@ export default function TeacherDashboardPage() {
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {quizzes.map((quiz) => {
+            {quizzes.map((quiz, index) => {
               const completionRate =
                 quiz.totalAssigned && quiz.totalAssigned > 0
                   ? Math.round(((quiz.totalCompleted || 0) / quiz.totalAssigned) * 100)
@@ -180,11 +239,20 @@ export default function TeacherDashboardPage() {
               return (
                 <div
                   key={quiz.id}
+                  id={`quiz-item-${quiz.id}`}
                   className="bg-white border border-slate-200/90 rounded-2xl shadow-sm hover:shadow-md transition-shadow p-6 flex flex-col justify-between space-y-5"
                 >
                   <div className="space-y-3">
                     <div className="flex items-start justify-between gap-3">
                       <div>
+                        <div className="flex items-center gap-2 mb-1.5">
+                          <span className="text-[10px] font-extrabold uppercase tracking-wider px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-100">
+                            Quiz #{index + 1}
+                          </span>
+                          <span className="text-[10px] text-slate-400 font-mono font-medium">
+                            [Index: {index}]
+                          </span>
+                        </div>
                         <h3 className="text-base font-bold text-slate-900 tracking-tight leading-snug">
                           {quiz.title}
                         </h3>
@@ -254,11 +322,16 @@ export default function TeacherDashboardPage() {
                     </div>
 
                     <button
-                      onClick={() => handleDelete(quiz.id)}
-                      title="Delete Quiz"
-                      className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition"
+                      onClick={() => handleDelete(quiz.id, index)}
+                      disabled={deletingId === quiz.id}
+                      title={`Delete Quiz #${index + 1}`}
+                      className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition disabled:opacity-50"
                     >
-                      <Trash2 className="w-4 h-4" />
+                      {deletingId === quiz.id ? (
+                        <div className="w-4 h-4 border-2 border-rose-500 border-t-transparent rounded-full animate-spin" />
+                      ) : (
+                        <Trash2 className="w-4 h-4" />
+                      )}
                     </button>
                   </div>
                 </div>

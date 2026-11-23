@@ -139,7 +139,7 @@ export default function LoginPage() {
           <form onSubmit={handleSubmit} noValidate className="space-y-4">
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-                {roleTab === 'TEACHER' ? 'Instructor Email' : 'Student Email'}{' '}
+                {roleTab === 'TEACHER' ? 'Teacher Email' : 'Student Email'}{' '}
                 <span className="text-rose-500 font-bold">*</span>
               </label>
               <input

@@ -124,7 +124,7 @@ export function Navbar() {
                     {user.name}
                   </p>
                   <p className="text-[11px] text-slate-500 font-medium leading-tight mt-0.5">
-                    {isTeacher ? 'Instructor' : 'Student'}
+                    {isTeacher ? 'Teacher' : 'Student'}
                   </p>
                 </div>
               </div>
@@ -187,7 +187,7 @@ export function Navbar() {
                 <div>
                   <p className="text-xs font-bold text-slate-900">{user.name}</p>
                   <p className="text-[11px] text-slate-500 font-medium">
-                    {isTeacher ? 'Instructor' : 'Student'} • {user.email}
+                    {isTeacher ? 'Teacher' : 'Student'} • {user.email}
                   </p>
                 </div>
               </div>

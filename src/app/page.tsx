@@ -126,7 +126,7 @@ export default function HomePage() {
                       <GraduationCap className="w-5 h-5" />
                     </div>
                     <div>
-                      <h3 className="text-sm font-bold text-slate-900">Instructor Portal</h3>
+                      <h3 className="text-sm font-bold text-slate-900">Teacher Portal</h3>
                       <p className="text-[11px] text-indigo-700 font-semibold">For Teachers & Educators</p>
                     </div>
                   </div>
